@@ -184,10 +184,18 @@ namespace WalletsService.Controllers
             if (mes == null)
             {
                 Response.StatusCode = 400;
-                return Content("json error");
+                return Content("Json error");
             }
 
-            _worker.AddOperation(userGuid, mes.value);
+            try
+            {
+                _worker.AddOperation(userGuid, mes.value);
+            }
+            catch (ArgumentException)
+            {
+                Response.StatusCode = 400;
+                return Content("Limit is exceeded");
+            }
 
             Response.StatusCode = 200;
             return Content("Complete");

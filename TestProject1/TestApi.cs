@@ -137,5 +137,25 @@ namespace TestProject1
             var b1 = GetBalanceResult(response2);
             Assert.IsTrue(b1.balance > 2000);
         }
+
+        [TestMethod] public async Task TestReplenishWalletLimit()
+        {
+            var url1 = "Wallets/ReplenishWallet";
+            _httpClient.DefaultRequestHeaders.Add("X-UserId", _userGuid1);
+            var mes = new ReplenishWalletMessage { value = 100000 };
+
+            var json = JsonConvert.SerializeObject(mes);
+            var data = new StringContent(json, Encoding.UTF8);
+
+            _httpClient.DefaultRequestHeaders
+                .Add("X-Digest", GetHashString(data.ReadAsStream()));
+            var response1 = await _httpClient.PostAsync(url1, data);
+            Assert.IsTrue(response1.StatusCode == HttpStatusCode.BadRequest);
+
+            var url2 = "Wallets/GetBalance";
+            var response2 = await _httpClient.PostAsync(url2, null);
+            var b1 = GetBalanceResult(response2);
+            Assert.IsTrue(b1.balance == 2000);
+        }
     }
 }
