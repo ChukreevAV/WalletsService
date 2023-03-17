@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+
+using WalletsService.MiddleLayer;
 using WalletsService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddDbContextFactory<WalletsContext>(opt
     => opt.UseInMemoryDatabase("Wallets"));
+
+builder.Services.AddScoped<IWorker, Worker>();
 
 var app = builder.Build();
 
