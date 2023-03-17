@@ -109,8 +109,17 @@ namespace TestProject1
             Assert.IsNotNull(m1);
         }
 
-        [TestMethod]
-        public async Task TestMethod4()
+        [TestMethod] public async Task TestGetCurrentMonth()
+        {
+            var url1 = "Wallets/GetCurrentMonth";
+            _httpClient.DefaultRequestHeaders.Add("X-UserId", _userGuid1);
+            var response1 = await _httpClient.PostAsync(url1, null);
+            Assert.IsTrue(response1.StatusCode == HttpStatusCode.OK);
+            var m1 = GetMonthResult(response1);
+            Assert.IsNotNull(m1);
+        }
+
+        [TestMethod] public async Task TestReplenishWallet()
         {
             var url1 = "Wallets/ReplenishWallet";
             _httpClient.DefaultRequestHeaders.Add("X-UserId", _userGuid1);

@@ -138,6 +138,28 @@ namespace WalletsService.Controllers
             return await new ValueTask<ActionResult<MonthResult>>(result);
         }
 
+        [HttpPost("GetCurrentMonth")]
+        public async Task<ActionResult<MonthResult>> PostGetCurrentMonth()
+        {
+            var userGuid = GetUserGuid();
+
+            if (userGuid == Guid.Empty)
+            {
+                Response.StatusCode = 400;
+                return Content("X-UserId error");
+            }
+
+            var result = _worker.GetMonthResult(userGuid, DateTime.Now.Month);
+
+            if (result == null)
+            {
+                Response.StatusCode = 400;
+                return Content("wallet not found");
+            }
+
+            return await new ValueTask<ActionResult<MonthResult>>(result);
+        }
+
         [HttpPost("ReplenishWallet")]
         public async Task<ActionResult> PostReplenishWallet()
         {
