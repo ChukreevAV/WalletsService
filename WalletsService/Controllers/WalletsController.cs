@@ -31,44 +31,39 @@ namespace WalletsService.Controllers
         {
             var headers = Request.Headers;
             var digest = headers["X-Digest"];
-            if (digest.Count <= 0) return string.Empty;
-            return digest[0];
+            return digest.Count <= 0 ? string.Empty : digest[0] ?? string.Empty;
         }
 
-
-      [HttpPost("CheckWallet")]
+        private const string UserIdError = "X-UserId error";
+        private const string DigestError = "X-Digest error";
+        private const string JsonError = "Json error";
+        private const string WalletNotFound = "Wallet not found";
+                               
+        /// <summary>Проверить существует ли аккаунт электронного кошелька</summary>
+        /// <returns></returns>
+        [HttpPost("CheckWallet")]
         public async Task<ActionResult<CheckAccountResult>> PostCheck()
         {
             var userGuid = GetUserGuid();
 
-            if (userGuid == Guid.Empty)
-            {
-                Response.StatusCode = 400;
-                return Content("X-UserId error");
-            }
+            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
 
             var result = new CheckAccountResult { isexist = _worker.CheckAccount(userGuid) };
             return await new ValueTask<ActionResult<CheckAccountResult>>(result);
         }
 
+        /// <summary>Получить баланс электронного кошелька</summary>
+        /// <returns></returns>
         [HttpPost("GetBalance")]
         public async Task<ActionResult<BalanceResult>> PostGetBalance()
         {
             var userGuid = GetUserGuid();
 
-            if (userGuid == Guid.Empty)
-            {
-                Response.StatusCode = 400;
-                return Content("X-UserId error");
-            }
+            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
 
             var result = _worker.GetBalance(userGuid);
 
-            if (result == null)
-            {
-                Response.StatusCode = 400;
-                return Content("Wallet not found");
-            }
+            if (result == null) return BadRequest(WalletNotFound);
 
             return await new ValueTask<ActionResult<BalanceResult>>(result);
         }
@@ -81,7 +76,6 @@ namespace WalletsService.Controllers
 
             foreach (var b in hash)
             {
-                // can be "x2" if you want lowercase
                 sb.Append(b.ToString("X2"));
             }
 
@@ -106,86 +100,62 @@ namespace WalletsService.Controllers
             return !compareHash ? null : rawData;
         }
 
+        /// <summary>Получить общее количество и суммы операций пополнения за выбранный месяц</summary>
+        /// <returns></returns>
         [HttpPost("GetMonth")]
         public async Task<ActionResult<MonthResult>> PostGetMonth()
         {
             var userGuid = GetUserGuid();
 
-            if (userGuid == Guid.Empty)
-            {
-                Response.StatusCode = 400;
-                return Content("X-UserId error");
-            }
+            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
 
             var rawData = await GetMessage();
 
-            if (rawData == null)
-            {
-                Response.StatusCode = 400;
-                return Content("X-Digest error");
-            }
+            if (rawData == null) return BadRequest(DigestError);
 
             var mes = JsonNode.Parse(rawData).Deserialize<MonthMessage>();
 
+            if (mes == null) return BadRequest(JsonError);
+
             var result = _worker.GetMonthResult(userGuid, mes.month);
 
-            if (result == null)
-            {
-                Response.StatusCode = 400;
-                return Content("wallet not found");
-            }
+            if (result == null) return BadRequest(WalletNotFound);
 
             return await new ValueTask<ActionResult<MonthResult>>(result);
         }
 
+        /// <summary>Получить общее количество и суммы операций пополнения за текущий месяц</summary>
+        /// <returns></returns>
         [HttpPost("GetCurrentMonth")]
         public async Task<ActionResult<MonthResult>> PostGetCurrentMonth()
         {
             var userGuid = GetUserGuid();
 
-            if (userGuid == Guid.Empty)
-            {
-                Response.StatusCode = 400;
-                return Content("X-UserId error");
-            }
+            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
 
             var result = _worker.GetMonthResult(userGuid, DateTime.Now.Month);
 
-            if (result == null)
-            {
-                Response.StatusCode = 400;
-                return Content("wallet not found");
-            }
+            if (result == null) return BadRequest(WalletNotFound);
 
             return await new ValueTask<ActionResult<MonthResult>>(result);
         }
 
+        /// <summary>Пополнение электронного кошелька</summary>
+        /// <returns></returns>
         [HttpPost("ReplenishWallet")]
         public async Task<ActionResult> PostReplenishWallet()
         {
             var userGuid = GetUserGuid();
 
-            if (userGuid == Guid.Empty)
-            {
-                Response.StatusCode = 400;
-                return Content("X-UserId error");
-            }
+            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
 
             var rawData = await GetMessage();
 
-            if (rawData == null)
-            {
-                Response.StatusCode = 400;
-                return Content("X-Digest error");
-            }
+            if (rawData == null) return BadRequest(DigestError);
 
             var mes = JsonNode.Parse(rawData).Deserialize<ReplenishWalletMessage>();
 
-            if (mes == null)
-            {
-                Response.StatusCode = 400;
-                return Content("Json error");
-            }
+            if (mes == null) return BadRequest(JsonError);
 
             try
             {
@@ -193,15 +163,15 @@ namespace WalletsService.Controllers
             }
             catch (ArgumentException)
             {
-                Response.StatusCode = 400;
-                return Content("Limit is exceeded");
+                return BadRequest("Limit is exceeded");
             }
 
             Response.StatusCode = 200;
             return Content("Complete");
         }
 
-        [HttpGet] public string Get()
+        [HttpGet]
+        public string Get()
         {
             return "test";
         }

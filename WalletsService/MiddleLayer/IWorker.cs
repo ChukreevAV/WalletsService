@@ -5,7 +5,7 @@ namespace WalletsService.MiddleLayer
     /// <summary>Интерфейс бизнес логики</summary>
     public interface IWorker
     {
-        /// <summary>Проверяем наличие кошелька</summary>
+        /// <summary>Проверяем наличия кошелька</summary>
         /// <param name="userGuid">Код пользователя</param>
         /// <returns></returns>
         bool CheckAccount(Guid userGuid);
@@ -21,7 +21,7 @@ namespace WalletsService.MiddleLayer
         /// <returns></returns>
         MonthResult? GetMonthResult(Guid userGuid, int month);
 
-        /// <summary>Получить баланс</summary>
+        /// <summary>Получить баланс кошелька</summary>
         /// <param name="userGuid">Код пользователя</param>
         /// <returns></returns>
         BalanceResult? GetBalance(Guid userGuid);

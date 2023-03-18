@@ -52,6 +52,19 @@ namespace TestProject1
             Assert.IsTrue(checkAccountResult.isexist);
         }
 
+        [TestMethod]
+        public async Task TestBadCheckWallet()
+        {
+            var url1 = "Wallets/CheckWallet";
+            _httpClient.DefaultRequestHeaders.Add("X-UserId", "");
+            var response = await _httpClient.PostAsync(url1, null);
+            var httpContent = response.Content;
+            var asyncContent = httpContent.ReadAsStringAsync().Result;
+            Assert.IsNotNull(asyncContent);
+            //var checkAccountResult = JsonNode.Parse(asyncContent).Deserialize<CheckAccountResult>();
+            //Assert.IsTrue(checkAccountResult.isexist);
+        }
+
         private BalanceResult? GetBalanceResult(HttpResponseMessage? mes)
         {
             var httpContent = mes?.Content;
@@ -141,7 +154,12 @@ namespace TestProject1
         [TestMethod] public async Task TestReplenishWalletLimit()
         {
             var url1 = "Wallets/ReplenishWallet";
+            var url2 = "Wallets/GetBalance";
             _httpClient.DefaultRequestHeaders.Add("X-UserId", _userGuid1);
+
+            var response3 = await _httpClient.PostAsync(url2, null);
+            var b2 = GetBalanceResult(response3);
+
             var mes = new ReplenishWalletMessage { value = 100000 };
 
             var json = JsonConvert.SerializeObject(mes);
@@ -152,10 +170,9 @@ namespace TestProject1
             var response1 = await _httpClient.PostAsync(url1, data);
             Assert.IsTrue(response1.StatusCode == HttpStatusCode.BadRequest);
 
-            var url2 = "Wallets/GetBalance";
             var response2 = await _httpClient.PostAsync(url2, null);
             var b1 = GetBalanceResult(response2);
-            Assert.IsTrue(b1.balance == 2000);
+            Assert.IsTrue(b1.balance == b2.balance);
         }
     }
 }
