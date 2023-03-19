@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+
+using WalletsService.Controllers.Nested;
 using WalletsService.Models;
 
 namespace TestProject1
@@ -12,6 +14,11 @@ namespace TestProject1
             using var context = new WalletsContext(optionsBuilder.Options);
             var count1 = context.Wallets.Count();
             Assert.IsTrue(count1 == 0);
+        }
+
+        [TestMethod] public void TestMetod1()
+        {
+            var str1 = InputMessageError.UserId.GetDescription();
         }
     }
 }

@@ -1,8 +1,5 @@
-﻿using System.Security.Cryptography;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json.Nodes;
-using System.Text;
-using System.Text.Json;
+﻿using Microsoft.AspNetCore.Mvc;
+
 using WalletsService.Controllers.Nested;
 using WalletsService.MiddleLayer;
 using WalletsService.MiddleLayer.Nested;
@@ -19,36 +16,15 @@ namespace WalletsService.Controllers
             _worker = worker;
         }
 
-        private Guid GetUserGuid()
-        {
-            var headers = Request.Headers;
-            var userId = headers["X-UserId"];
-            if (userId.Count <= 0) return Guid.Empty;
-            return Guid.TryParse(userId[0], out var userGuid) ? userGuid : Guid.Empty;
-        }
-
-        private string GetDigest()
-        {
-            var headers = Request.Headers;
-            var digest = headers["X-Digest"];
-            return digest.Count <= 0 ? string.Empty : digest[0] ?? string.Empty;
-        }
-
-        private const string UserIdError = "X-UserId error";
-        private const string DigestError = "X-Digest error";
-        private const string JsonError = "Json error";
-        private const string WalletNotFound = "Wallet not found";
-                               
         /// <summary>Проверить существует ли аккаунт электронного кошелька</summary>
         /// <returns></returns>
         [HttpPost("CheckWallet")]
         public async Task<ActionResult<CheckAccountResult>> PostCheck()
         {
-            var userGuid = GetUserGuid();
+            var mes = InputMessage.ReadUserId(this);
+            if (mes.Error != InputMessageError.None) return BadRequest(mes.Error.GetDescription());
 
-            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
-
-            var result = new CheckAccountResult { isexist = _worker.CheckAccount(userGuid) };
+            var result = new CheckAccountResult { isexist = _worker.CheckAccount(mes.UserId) };
             return await new ValueTask<ActionResult<CheckAccountResult>>(result);
         }
 
@@ -57,47 +33,13 @@ namespace WalletsService.Controllers
         [HttpPost("GetBalance")]
         public async Task<ActionResult<BalanceResult>> PostGetBalance()
         {
-            var userGuid = GetUserGuid();
+            var mes = InputMessage.ReadUserId(this);
+            if (mes.Error != InputMessageError.None) return BadRequest(mes.Error.GetDescription());
 
-            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
-
-            var result = _worker.GetBalance(userGuid);
-
-            if (result == null) return BadRequest(WalletNotFound);
+            var result = _worker.GetBalance(mes.UserId);
+            if (result == null) return BadRequest(InputMessageError.WalletNotFound.GetDescription());
 
             return await new ValueTask<ActionResult<BalanceResult>>(result);
-        }
-
-        private bool CompareHash(byte[] rawData, string testHash)
-        {
-            using var sha1 = new SHA1Managed();
-            var hash = sha1.ComputeHash(rawData);
-            var sb = new StringBuilder(hash.Length * 2);
-
-            foreach (var b in hash)
-            {
-                sb.Append(b.ToString("X2"));
-            }
-
-            var h1 = sb.ToString();
-            return testHash == h1;
-        }
-
-        private async Task<byte[]?> GetMessage()
-        {
-            byte[]? rawData;
-
-            using (var ms = new MemoryStream())
-            {
-                await Request.Body.CopyToAsync(ms);
-                ms.Position = 0;
-                rawData = ms.ToArray();
-            }
-
-            var digest = GetDigest();
-            var compareHash = CompareHash(rawData, digest);
-
-            return !compareHash ? null : rawData;
         }
 
         /// <summary>Получить общее количество и суммы операций пополнения за выбранный месяц</summary>
@@ -105,21 +47,16 @@ namespace WalletsService.Controllers
         [HttpPost("GetMonth")]
         public async Task<ActionResult<MonthResult>> PostGetMonth()
         {
-            var userGuid = GetUserGuid();
+            var message = InputMessage.ReadMessaged(this); 
+            if (message.Error != InputMessageError.None) return BadRequest(message.Error.GetDescription());
 
-            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
+            var data = message.ParseJson<MonthMessage>();
 
-            var rawData = await GetMessage();
+            if (data == null) return BadRequest(InputMessageError.Json.GetDescription());
 
-            if (rawData == null) return BadRequest(DigestError);
+            var result = _worker.GetMonthResult(message.UserId, data.month);
 
-            var mes = JsonNode.Parse(rawData).Deserialize<MonthMessage>();
-
-            if (mes == null) return BadRequest(JsonError);
-
-            var result = _worker.GetMonthResult(userGuid, mes.month);
-
-            if (result == null) return BadRequest(WalletNotFound);
+            if (result == null) return BadRequest(InputMessageError.WalletNotFound.GetDescription());
 
             return await new ValueTask<ActionResult<MonthResult>>(result);
         }
@@ -129,13 +66,12 @@ namespace WalletsService.Controllers
         [HttpPost("GetCurrentMonth")]
         public async Task<ActionResult<MonthResult>> PostGetCurrentMonth()
         {
-            var userGuid = GetUserGuid();
+            var mes = InputMessage.ReadUserId(this);
+            if (mes.Error != InputMessageError.None) return BadRequest(mes.Error.GetDescription());
 
-            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
+            var result = _worker.GetMonthResult(mes.UserId, DateTime.Now.Month);
 
-            var result = _worker.GetMonthResult(userGuid, DateTime.Now.Month);
-
-            if (result == null) return BadRequest(WalletNotFound);
+            if (result == null) return BadRequest(InputMessageError.WalletNotFound.GetDescription());
 
             return await new ValueTask<ActionResult<MonthResult>>(result);
         }
@@ -143,31 +79,26 @@ namespace WalletsService.Controllers
         /// <summary>Пополнение электронного кошелька</summary>
         /// <returns></returns>
         [HttpPost("ReplenishWallet")]
-        public async Task<ActionResult> PostReplenishWallet()
+        public Task<ActionResult> PostReplenishWallet()
         {
-            var userGuid = GetUserGuid();
+            var message = InputMessage.ReadMessaged(this);
+            if (message.Error != InputMessageError.None) return Task.FromResult<ActionResult>(BadRequest(message.Error.GetDescription()));
 
-            if (userGuid == Guid.Empty) return BadRequest(UserIdError);
+            var mes = message.ParseJson<ReplenishWalletMessage>();
 
-            var rawData = await GetMessage();
-
-            if (rawData == null) return BadRequest(DigestError);
-
-            var mes = JsonNode.Parse(rawData).Deserialize<ReplenishWalletMessage>();
-
-            if (mes == null) return BadRequest(JsonError);
+            if (mes == null) return Task.FromResult<ActionResult>(BadRequest(InputMessageError.Json.GetDescription()));
 
             try
             {
-                _worker.AddOperation(userGuid, mes.value);
+                _worker.AddOperation(message.UserId, mes.value);
             }
             catch (ArgumentException)
             {
-                return BadRequest("Limit is exceeded");
+                return Task.FromResult<ActionResult>(BadRequest("Limit is exceeded"));
             }
 
             Response.StatusCode = 200;
-            return Content("Complete");
+            return Task.FromResult<ActionResult>(Content("Complete"));
         }
 
         [HttpGet]
